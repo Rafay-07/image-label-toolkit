@@ -1,4 +1,8 @@
-"""Command line: python -m imglabel.cli <command> ..."""
+"""Command line: python -m imglabel.cli <command> ...
+
+Commands: synth (make sample data), check (health + label checks), agree (compare two labellers),
+split (train/validation counts), overlay (draw boxes on images).
+"""
 import argparse
 import json
 import os
@@ -7,6 +11,7 @@ from . import agreement, dataset, overlay, split, synth
 
 
 def main(argv=None):
+    # Set up the five commands and the arguments each one accepts.
     ap = argparse.ArgumentParser(prog="imglabel")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("synth"); s.add_argument("folder"); s.add_argument("-n", type=int, default=12)
@@ -17,9 +22,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     if a.cmd == "synth":
+        # Make n fake images plus their correct labels.
         synth.generate(a.folder, a.n)
         print(f"wrote {a.n} images and annotations.json to {a.folder}")
     elif a.cmd == "check":
+        # Index the images, then check the label file against them.
         ds = dataset.Dataset()
         n, corrupt = ds.index(a.folder)
         ann = json.load(open(a.annotations))
@@ -29,12 +36,15 @@ def main(argv=None):
             print(" -", p)
         print("class counts:", agreement.class_counts(ann))
     elif a.cmd == "agree":
+        # Compare two labellers' files. --iou is how much two boxes must overlap to count as a match.
         print(agreement.agreement(json.load(open(a.a)), json.load(open(a.b)), a.iou))
     elif a.cmd == "split":
+        # Only counts how many images would go to train and validation. It does not move any files.
         names = [f for f in os.listdir(a.folder) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
         tr, va = split.split(names, a.val)
         print(f"train {len(tr)}, val {len(va)}")
     elif a.cmd == "overlay":
+        # Write a copy of every image with its boxes drawn on, for a quick visual check.
         os.makedirs(a.outdir, exist_ok=True)
         for name, boxes in json.load(open(a.annotations)).items():
             overlay.draw(os.path.join(a.folder, name), boxes, os.path.join(a.outdir, name))
